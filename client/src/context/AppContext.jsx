@@ -94,31 +94,34 @@ export function AppContextProvider({ children }) {
     }
   }, [user]);
 
-  const loadProject = useCallback(async (id, silent = false) => {
-    if (!user) return;
-    if (!silent) setLoadingActiveProject(true);
-    try {
-      const { data } = await api.get(`/api/projects/${id}`);
-      setActiveProject(data);
-      //Default file selection
-      const files = Object.keys(data.files);
-      if (files.length > 0) {
-        setActiveFile((prev) => {
-          if (files.includes(prev)) return prev;
-          if (files.includes("/App.js")) return "/App.js";
-          return files[0];
-        });
+  const loadProject = useCallback(
+    async (id, silent = false) => {
+      if (!user) return;
+      if (!silent) setLoadingActiveProject(true);
+      try {
+        const { data } = await api.get(`/api/projects/${id}`);
+        setActiveProject(data);
+        //Default file selection
+        const files = Object.keys(data.files);
+        if (files.length > 0) {
+          setActiveFile((prev) => {
+            if (files.includes(prev)) return prev;
+            if (files.includes("/App.js")) return "/App.js";
+            return files[0];
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load project:", err);
+        if (!silent) {
+          toast.error("Failed to load project details");
+          navigate("/");
+        }
+      } finally {
+        if (!silent) setLoadingActiveProject(false);
       }
-    } catch (err) {
-      console.error("Failed to load project:", err);
-      if (!silent) {
-        toast.error("Failed to load project details");
-        navigate("/");
-      }
-    } finally {
-      if (!silent) setLoadingActiveProject(false);
-    }
-  }, [user, navigate]);
+    },
+    [user, navigate],
+  );
   //Automatically poll active project status if generating or pending
   useEffect(() => {
     if (!activeProject?._id || !user) return;
@@ -168,6 +171,30 @@ export function AppContextProvider({ children }) {
     },
     [user],
   );
+  const handleChat = useCallback(
+    async (prompt) => {
+      if (!activeProject || !user) return;
+      setChatLoading(true);
+      try {
+        const { data } = await api.post(
+          `/api/projects/${activeProject._id}/chat`,
+          { prompt },
+        );
+        setActiveProject(data);
+        if (data.errors && data.errors.length > 0) {
+          toast.error(`${data.errors.length} resivion patch(es) failed`);
+        } else {
+          toast.success(`Updated to version ${data.version}`);
+        }
+      } catch (err) {
+        console.error("Revision request failed: ", err);
+        toast.error(err?.response?.data?.error || "Revision request failed");
+      } finally {
+        setChatLoading(false);
+      }
+    },
+    [activeProject, user],
+  );
   return (
     <AppContext.Provider
       value={{
@@ -188,6 +215,7 @@ export function AppContextProvider({ children }) {
         loadProject,
         handleGenerate,
         handleDelete,
+        handleChat,
         setActiveFile,
         setShowCode,
         setGeneratingProject,
