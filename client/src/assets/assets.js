@@ -9,3 +9,5 @@ export const homeTags = [
         "Marketing Website",
         "Educational Website",
     ];
+
+export default homeTags;
